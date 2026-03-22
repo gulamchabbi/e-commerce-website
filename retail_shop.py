@@ -1,9 +1,29 @@
-from flask import Flask, render_template, request, redirect, url_for
+import streamlit as st
 import sqlite3
 import random
 import os
+import base64
 
-app = Flask(__name__)
+# ---------- FUNCTION TO SET BACKGROUND IMAGE ----------
+def set_bg_image(image_file):
+    image_path = os.path.join("static", "images", image_file)
+    if not os.path.exists(image_path):
+        st.warning(f"Background image not found: {image_path}")
+        return
+    with open(image_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # ---------- DATABASE ----------
 DB_NAME = "store.db"
@@ -43,20 +63,14 @@ def recommend_products(category, current_id):
     c = conn.cursor()
     c.execute("SELECT * FROM products WHERE category=? AND id!=?", (category, current_id))
     same_cat = c.fetchall()
-    if len(same_cat) < 3:
+    if len(same_cat) < 1:
         c.execute("SELECT * FROM products WHERE id!=?", (current_id,))
         same_cat = c.fetchall()
     conn.close()
     return random.sample(same_cat, min(3, len(same_cat)))
 
-# ---------- ROUTES ----------
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-@app.route("/products")
-def products():
-    search = request.args.get("search", "")
+# ---------- PRODUCT OPERATIONS ----------
+def get_products(search=""):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     if search:
@@ -65,17 +79,16 @@ def products():
         c.execute("SELECT * FROM products")
     items = c.fetchall()
     conn.close()
-    return render_template("products.html", products=items, dynamic_price=dynamic_price)
+    return items
 
-@app.route("/buy/<int:pid>")
-def buy(pid):
+def buy_product(pid):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT * FROM products WHERE id=?", (pid,))
     product = c.fetchone()
     if not product:
         conn.close()
-        return "Product not found"
+        return False, "Product not found", []
     stock = product[3]
     category = product[4]
     if stock > 0:
@@ -86,9 +99,35 @@ def buy(pid):
         message = "❌ Sorry, Out of Stock"
     conn.close()
     recs = recommend_products(category, pid)
-    return render_template("cart.html", product=product, message=message, recs=recs, dynamic_price=dynamic_price)
+    return stock > 0, message, recs
 
-# ---------- RUN ----------
-if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+# ---------- STREAMLIT UI ----------
+init_db()
+st.set_page_config(page_title="SmartStore", page_icon="🛒", layout="wide")
+set_bg_image("background.jpg")
+
+st.title("🛒 SmartStore - AI Powered Online Shop")
+
+# Search
+search = st.text_input("Search products...", "")
+products = get_products(search)
+
+for p in products:
+    col1, col2 = st.columns([2,1])
+    with col1:
+        st.subheader(f"{p[1]}")
+        try:
+            st.image(f"static/images/{p[5]}", width=200)
+        except:
+            st.write("Image not found")
+        st.write(f"Category: {p[4]}")
+        st.write(f"💰 Price: ₹{dynamic_price(p[2], p[3])}")
+        st.write(f"Stock: {p[3]}")
+    with col2:
+        if st.button(f"Buy {p[1]}", key=p[0]):
+            success, message, recs = buy_product(p[0])
+            st.success(message)
+            if success and recs:
+                st.subheader("You may also like:")
+                for r in recs:
+                    st.write(f"- {r[1]} (₹{dynamic_price(r[2], r[3])}, Stock: {r[3]})")
