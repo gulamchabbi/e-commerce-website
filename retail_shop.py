@@ -1,13 +1,10 @@
-
-
 import streamlit as st
 import sqlite3
 import random
 import os
 import base64
-import streamlit as st
 
--------- FUNCTION TO SET BACKGROUND IMAGE ----------
+# ---------- FUNCTION TO SET BACKGROUND IMAGE ----------
 def set_bg_image(image_file):
     image_path = os.path.join("static", "images", image_file)
     if not os.path.exists(image_path):
@@ -36,6 +33,8 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS products
                  (id INTEGER PRIMARY KEY, name TEXT, price REAL, stock INTEGER, category TEXT, image TEXT)''')
+    
+    # Insert initial data if empty
     c.execute("SELECT COUNT(*) FROM products")
     if c.fetchone()[0] == 0:
         products = [
@@ -48,6 +47,7 @@ def init_db():
             ("Keyboard", 2500, 12, "Electronics", "keyboard.jpg")
         ]
         c.executemany("INSERT INTO products (name, price, stock, category, image) VALUES (?, ?, ?, ?, ?)", products)
+    
     conn.commit()
     conn.close()
 
@@ -92,6 +92,7 @@ def buy_product(pid):
     if not product:
         conn.close()
         return False, "Product not found", []
+    
     stock = product[3]
     category = product[4]
     if stock > 0:
@@ -100,6 +101,7 @@ def buy_product(pid):
         message = "✅ Order Successful!"
     else:
         message = "❌ Sorry, Out of Stock"
+    
     conn.close()
     recs = recommend_products(category, pid)
     return stock > 0, message, recs
@@ -111,17 +113,19 @@ set_bg_image("background.jpg")
 
 st.title("🛒 SmartStore - AI Powered Online Shop")
 
-# Search
+# Search bar
 search = st.text_input("Search products...", "")
 products = get_products(search)
 
+# Display products
 for p in products:
     col1, col2 = st.columns([2,1])
     with col1:
         st.subheader(f"{p[1]}")
-        try:
-            st.image(f"static/images/{p[5]}", width=200)
-        except:
+        image_path = os.path.join("static", "images", p[5])
+        if os.path.exists(image_path):
+            st.image(image_path, width=200)
+        else:
             st.write("Image not found")
         st.write(f"Category: {p[4]}")
         st.write(f"💰 Price: ₹{dynamic_price(p[2], p[3])}")
