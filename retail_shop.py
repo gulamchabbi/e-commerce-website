@@ -1,27 +1,35 @@
 import streamlit as st
-import sqlite3
-import random
-import os
 import base64
-import streamlit as st
 
 def set_bg():
+    with open("static/images/background.jpg", "rb") as f:
+        data = f.read()
+    encoded = base64.b64encode(data).decode()
+
     st.markdown(
-        """
+        f"""
         <style>
-        .stApp {
-            background-image: url("static/images/background.jpg");
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-        }
+        }}
         </style>
         """,
         unsafe_allow_html=True
     )
 
 set_bg()
-# ---------- FUNCTION TO SET BACKGROUND IMAGE ----------
+
+import streamlit as st
+import sqlite3
+import random
+import os
+import base64
+import streamlit as st
+
+- FUNCTION TO SET BACKGROUND IMAGE ----------
 def set_bg_image(image_file):
     image_path = os.path.join("static", "images", image_file)
     if not os.path.exists(image_path):
